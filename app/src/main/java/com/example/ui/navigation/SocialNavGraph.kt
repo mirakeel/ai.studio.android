@@ -12,7 +12,9 @@ import com.example.ui.HomeScreen
 import com.example.ui.PlatformScreen
 import com.example.ui.SettingsScreen
 import com.example.ui.TrendingDetailScreen
-
+import com.example.ui.FocusModeSettingsScreen
+import com.example.ui.RelatedContentScreen
+ 
 /**
  * Navigation graph setting up all screens and passing corresponding callbacks.
  */
@@ -55,6 +57,24 @@ fun SocialNavGraph(
         
         composable(Screen.Settings.route) {
             SettingsScreen(
+                onBackClick = { navController.popBackStack() },
+                onFocusModeSettingsClick = {
+                    navController.navigate(Screen.FocusModeSettings.route)
+                },
+                onRelatedContentClick = {
+                    navController.navigate(Screen.RelatedContent.route)
+                }
+            )
+        }
+        
+        composable(Screen.RelatedContent.route) {
+            RelatedContentScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+        
+        composable(Screen.FocusModeSettings.route) {
+            FocusModeSettingsScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }

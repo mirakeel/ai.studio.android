@@ -13,6 +13,10 @@ sealed class Screen(val route: String) {
     
     object Settings : Screen("settings")
     
+    object FocusModeSettings : Screen("focus_mode_settings")
+    
+    object RelatedContent : Screen("related_content")
+    
     object TrendingDetail : Screen("trending/{trendId}") {
         fun createRoute(trendId: String) = "trending/$trendId"
     }

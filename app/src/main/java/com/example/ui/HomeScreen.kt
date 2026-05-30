@@ -41,9 +41,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.theme.*
 import com.example.viewmodel.SocialDashViewModel
+import com.example.viewmodel.RequestState
+import androidx.compose.foundation.horizontalScroll
 
 // Mock data models for dynamic updates on tab switching
 data class UsageData(
@@ -83,42 +86,63 @@ fun HomeScreen(
     viewModel: SocialDashViewModel = viewModel()
 ) {
     // 1. Dynamic States
-    var selectedTab by remember { mutableIntStateOf(0) } // 0: Today, 1: This Week, 2: This Month
-    var isAiDialogOpen by remember { mutableStateOf(false) }
-    
-    // Hardcoded Mock Data for Usage Tabs
-    val todayUsage = UsageData(
-        instagramShare = 50f,
-        xShare = 30f,
-        youtubeShare = 20f,
-        totalHours = "3h 42m",
-        totalLabel = "Active Today"
-    )
-    val weekUsage = UsageData(
-        instagramShare = 40f,
-        xShare = 35f,
-        youtubeShare = 25f,
-        totalHours = "24h 15m",
-        totalLabel = "Active Week"
-    )
-    val monthUsage = UsageData(
-        instagramShare = 50f,
-        xShare = 20f,
-        youtubeShare = 30f,
-        totalHours = "96h 48m",
-        totalLabel = "Active Month"
-    )
+    val usageStats by viewModel.usageStats.collectAsStateWithLifecycle()
+    val trackerStats by viewModel.trackerStats.collectAsStateWithLifecycle()
+    val trendingTopics by viewModel.trendingTopics.collectAsStateWithLifecycle()
+    val platformInfoList by viewModel.platformInfo.collectAsStateWithLifecycle()
 
-    val currentUsage = when (selectedTab) {
-        0 -> todayUsage
-        1 -> weekUsage
-        else -> monthUsage
+    var selectedTab by remember { mutableIntStateOf(0) } // 0: Today, 1: This Week, 2: This Month
+    var isRelatedSheetOpen by remember { mutableStateOf(false) }
+
+    // Initial data load
+    LaunchedEffect(Unit) {
+        viewModel.refreshData()
+    }
+    
+    // Calculate Dynamic Usage Data based on Tracker Stats
+    val currentUsage = remember(trackerStats, selectedTab) {
+        val filtered = trackerStats.filter { 
+            it.platform in listOf(com.example.model.Platform.INSTAGRAM, com.example.model.Platform.X, com.example.model.Platform.YOUTUBE)
+        }
+        
+        val igStats = filtered.find { it.platform == com.example.model.Platform.INSTAGRAM }
+        val xStats = filtered.find { it.platform == com.example.model.Platform.X }
+        val ytStats = filtered.find { it.platform == com.example.model.Platform.YOUTUBE }
+        
+        val igMinutes = when(selectedTab) { 0 -> igStats?.minutesToday ?: 0; 1 -> igStats?.minutesWeek ?: 0; else -> igStats?.minutesMonth ?: 0 }
+        val xMinutes = when(selectedTab) { 0 -> xStats?.minutesToday ?: 0; 1 -> xStats?.minutesWeek ?: 0; else -> xStats?.minutesMonth ?: 0 }
+        val ytMinutes = when(selectedTab) { 0 -> ytStats?.minutesToday ?: 0; 1 -> ytStats?.minutesWeek ?: 0; else -> ytStats?.minutesMonth ?: 0 }
+        
+        val totalMinutes = igMinutes + xMinutes + ytMinutes
+        val totalHoursStr = if (totalMinutes >= 60) "${totalMinutes / 60}h ${totalMinutes % 60}m" else "${totalMinutes}m"
+        
+        // Handle case where total is 0 to avoid NaN or empty charts
+        val usageData = if (totalMinutes == 0) {
+            UsageData(
+                instagramShare = 33.3f, // Default even split if no data
+                xShare = 33.3f,
+                youtubeShare = 33.4f,
+                totalHours = "0m",
+                totalLabel = when(selectedTab) { 0 -> "Active Today"; 1 -> "Active Week"; else -> "Active Month" }
+            )
+        } else {
+            UsageData(
+                instagramShare = (igMinutes.toFloat() / totalMinutes * 100),
+                xShare = (xMinutes.toFloat() / totalMinutes * 100),
+                youtubeShare = (ytMinutes.toFloat() / totalMinutes * 100),
+                totalHours = totalHoursStr,
+                totalLabel = when(selectedTab) { 0 -> "Active Today"; 1 -> "Active Week"; else -> "Active Month" }
+            )
+        }
+        usageData
     }
 
     // Mock Trending updates
-    val trendingList = remember(viewModel) {
-        viewModel.getTrendingTopics().map { trendingTopic ->
-            TrendIntel(
+    val trendingList = remember(trendingTopics) {
+        trendingTopics
+            .filter { it.platform in listOf(com.example.model.Platform.INSTAGRAM, com.example.model.Platform.X, com.example.model.Platform.YOUTUBE) }
+            .map { trendingTopic ->
+                TrendIntel(
                 id = trendingTopic.id,
                 platformName = trendingTopic.platform.name,
                 platformColor = when (trendingTopic.platform) {
@@ -127,7 +151,7 @@ fun HomeScreen(
                     com.example.model.Platform.YOUTUBE -> ColorYoutube
                 },
                 hashtag = trendingTopic.title,
-                reachValue = "${trendingTopic.impressions / 1000}K",
+                reachValue = if (trendingTopic.impressions > 1000) "${trendingTopic.impressions / 1000}K" else "${trendingTopic.impressions}",
                 increasePercentage = "+${trendingTopic.velocity.toInt()}%",
                 sparklinePoints = listOf(10f, 25f, 15f, 45f, 30f, 75f, 90f)
             )
@@ -135,9 +159,11 @@ fun HomeScreen(
     }
 
     // Platform List
-    val platformDigests = remember(viewModel) {
-        viewModel.getPlatformDigests().map { platformInfo ->
-            PlatformDigest(
+    val platformDigests = remember(platformInfoList) {
+        platformInfoList
+            .filter { it.platform in listOf(com.example.model.Platform.INSTAGRAM, com.example.model.Platform.X, com.example.model.Platform.YOUTUBE) }
+            .map { platformInfo ->
+                PlatformDigest(
                 id = platformInfo.platform.name.lowercase(),
                 name = platformInfo.displayName,
                 iconName = when (platformInfo.platform) {
@@ -150,8 +176,8 @@ fun HomeScreen(
                     com.example.model.Platform.X -> Color.White
                     com.example.model.Platform.YOUTUBE -> ColorYoutube
                 },
-                digestText = "Platform status updated.",
-                unreadCount = 3,
+                digestText = if (platformInfo.isConnected) "Stream is active." else "Connection required.",
+                unreadCount = if (platformInfo.isConnected) 3 else 0,
                 fullAlerts = listOf("Alert 1", "Alert 2")
             )
         }
@@ -208,6 +234,30 @@ fun HomeScreen(
                 windowInsets = WindowInsets.statusBars
             )
         },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { isRelatedSheetOpen = true },
+                containerColor = AccentIndigo,
+                contentColor = Color.White,
+                modifier = Modifier.testTag("btn_launch_related_sheet")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = "Show Related Content"
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Related Content",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+            }
+        },
         containerColor = DarkBackground
     ) { innerPadding ->
         Column(
@@ -226,11 +276,6 @@ fun HomeScreen(
                 usageData = currentUsage
             )
 
-            // 3. AI Digest Card (Gradient glass card with interactive expand details)
-            AIDigestCardSection(
-                onOpenClick = { isAiDialogOpen = true }
-            )
-
             // 4. Trending Intel Section (Horizontal list with Sparklines & reach indicators)
             TrendingIntelSection(
                 trendingList = trendingList,
@@ -247,10 +292,9 @@ fun HomeScreen(
         }
     }
 
-    // AI Digest Premium Detail Overlay Dialog
-    if (isAiDialogOpen) {
-        AIDigestDetailDialog(
-            onDismiss = { isAiDialogOpen = false }
+    if (isRelatedSheetOpen) {
+        RelatedContentBottomSheet(
+            onDismissRequest = { isRelatedSheetOpen = false }
         )
     }
 }
@@ -537,8 +581,21 @@ fun TrendingIntelSection(
     trendingList: List<TrendIntel>,
     onTrendClick: (String) -> Unit = {}
 ) {
+    // Separate trending topics by platform
+    val platforms = listOf("X", "INSTAGRAM", "YOUTUBE")
+    val platformDisplayNames = mapOf(
+        "X" to "X Platform Trends",
+        "INSTAGRAM" to "Instagram Trends",
+        "YOUTUBE" to "YouTube Trends"
+    )
+    val platformColors = mapOf(
+        "X" to Color.White,
+        "INSTAGRAM" to ColorInstagram,
+        "YOUTUBE" to ColorYoutube
+    )
+
     Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -560,13 +617,41 @@ fun TrendingIntelSection(
             )
         }
 
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(end = 16.dp)
-        ) {
-            items(trendingList) { trend ->
-                TrendingCard(trend = trend, onClick = { onTrendClick(trend.id) })
+        platforms.forEach { platformKey ->
+            val platformTrends = trendingList.filter { it.platformName.uppercase() == platformKey }.take(5)
+            if (platformTrends.isNotEmpty()) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(platformColors[platformKey] ?: Color.White)
+                        )
+                        Text(
+                            text = platformDisplayNames[platformKey] ?: platformKey,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = TextSecondary
+                        )
+                    }
+
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(end = 16.dp)
+                    ) {
+                        items(platformTrends) { trend ->
+                            TrendingCard(trend = trend, onClick = { onTrendClick(trend.id) })
+                        }
+                    }
+                }
             }
         }
     }
@@ -1077,6 +1162,456 @@ fun PlatformDetailDialog(
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AIDailyBriefSection(
+    viewModel: SocialDashViewModel,
+    modifier: Modifier = Modifier
+) {
+    val dailyBriefState by viewModel.dailyBriefState.collectAsStateWithLifecycle()
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("ai_daily_brief_card"),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        border = BorderStroke(1.dp, SubtleBorderColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = "Brief Icon",
+                        tint = AccentIndigoLight,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = "AI Daily Brief",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(AccentIndigo.copy(alpha = 0.15f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "LOCAL ANALYTICS",
+                        color = AccentIndigoLight,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 9.sp,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
+
+            when (val state = dailyBriefState) {
+                is RequestState.Idle -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("daily_brief_idle"),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Generate a daily consolidated intelligence capsule analyzing your connected feeds. Highlights critical events, trending discussions, and optimized tag strategies locally and securely.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary,
+                            lineHeight = 20.sp
+                        )
+
+                        Button(
+                            onClick = { viewModel.generateDailyBrief() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp)
+                                .testTag("btn_generate_daily_brief"),
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Bolt,
+                                    contentDescription = "Bolt",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "Generate AI Daily Brief",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+                }
+
+                is RequestState.Loading -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp)
+                            .testTag("daily_brief_loading"),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            color = AccentIndigo,
+                            modifier = Modifier.size(36.dp)
+                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "Assembling Daily Brief...",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                            Text(
+                                text = "Analyzing Instagram updates, X conversations, and YouTube views...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    }
+                }
+
+                is RequestState.Error -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("daily_brief_error"),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = "Error",
+                                tint = Color.Red,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Failed to compile intelligence: ${state.message}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.Red
+                            )
+                        }
+
+                        Button(
+                            onClick = { viewModel.generateDailyBrief() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(40.dp)
+                                .testTag("btn_retry_daily_brief"),
+                            colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceElevated),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Refresh",
+                                    tint = TextPrimary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "Retry Analysis",
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+                            }
+                        }
+                    }
+                }
+
+                is RequestState.Success -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("daily_brief_success"),
+                        verticalArrangement = Arrangement.spacedBy(20.dp)
+                    ) {
+                        val brief = state.data
+
+                        // 1. Instagram Brief Tab/Card
+                        BriefPlatformItem(
+                            platformName = "Instagram",
+                            brandColor = ColorInstagram,
+                            icon = Icons.Default.CameraAlt,
+                            summary = brief.instagramBrief,
+                            testTagPrefix = "instagram"
+                        )
+
+                        // 2. X Brief Tab/Card
+                        BriefPlatformItem(
+                            platformName = "X Platform",
+                            brandColor = Color.White,
+                            icon = Icons.Default.Close,
+                            summary = brief.xBrief,
+                            testTagPrefix = "x"
+                        )
+
+                        // 3. YouTube Brief Tab/Card
+                        BriefPlatformItem(
+                            platformName = "YouTube",
+                            brandColor = ColorYoutube,
+                            icon = Icons.Default.PlayArrow,
+                            summary = brief.youtubeBrief,
+                            testTagPrefix = "youtube"
+                        )
+
+                        HorizontalDivider(color = SubtleBorderColor.copy(alpha = 0.5f))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Generated at: Just now",
+                                fontSize = 11.sp,
+                                color = TextMuted
+                            )
+
+                            TextButton(
+                                onClick = { viewModel.generateDailyBrief() },
+                                modifier = Modifier.testTag("btn_regenerate_daily_brief")
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Refresh,
+                                        contentDescription = "Refresh",
+                                        tint = AccentIndigoLight,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = "Regenerate Brief",
+                                        fontWeight = FontWeight.Bold,
+                                        color = AccentIndigoLight,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BriefPlatformItem(
+    platformName: String,
+    brandColor: Color,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    summary: com.example.model.PlatformSummary,
+    testTagPrefix: String
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("${testTagPrefix}_brief_item"),
+        colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(0.5.dp, SubtleBorderColor.copy(alpha = 0.5f))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Platform Identifier Title
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(brandColor.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = platformName,
+                        tint = brandColor,
+                        modifier = Modifier.size(12.dp)
+                    )
+                }
+                Text(
+                    text = platformName,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = TextPrimary
+                )
+            }
+
+            // Summary description
+            Text(
+                text = summary.summaryText,
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+                lineHeight = 16.sp
+            )
+
+            // Key Events list
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Event,
+                        contentDescription = "Events",
+                        tint = brandColor,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = "KEY EVENTS",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = brandColor,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+                summary.keyEvents.forEachIndexed { idx, event ->
+                    Row(
+                        modifier = Modifier.padding(start = 4.dp),
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "•",
+                            color = brandColor,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = event,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary,
+                            lineHeight = 15.sp,
+                            modifier = Modifier.testTag("${testTagPrefix}_key_event_$idx")
+                        )
+                    }
+                }
+            }
+
+            // Top Discussions
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Forum,
+                        contentDescription = "Forum",
+                        tint = brandColor,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = "TOP DISCUSSIONS",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = brandColor,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+                summary.topDiscussions.forEachIndexed { idx, discussion ->
+                    Row(
+                        modifier = Modifier.padding(start = 4.dp),
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "»",
+                            color = brandColor,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = discussion,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary,
+                            lineHeight = 15.sp,
+                            modifier = Modifier.testTag("${testTagPrefix}_discussion_$idx")
+                        )
+                    }
+                }
+            }
+
+            // Recommended Topics (Scrollable Chips layout to avoid clipping)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "RECOMMENDED TOPICS",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextMuted,
+                    letterSpacing = 0.5.sp
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    summary.recommendedTopics.forEachIndexed { idx, topic ->
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(brandColor.copy(alpha = 0.12f))
+                                .border(0.5.dp, brandColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                                .testTag("${testTagPrefix}_recommended_topic_$idx")
+                        ) {
+                            Text(
+                                text = "#$topic",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = brandColor
+                            )
+                        }
+                    }
                 }
             }
         }

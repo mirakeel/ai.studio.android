@@ -53,6 +53,16 @@ fun TrendingDetailScreen(
     trendId: String,
     onBackClick: () -> Unit
 ) {
+    var isRelatedSheetOpen by remember { mutableStateOf(false) }
+    val viewedItemToPass = remember(trendId) {
+        when (trendId.lowercase()) {
+            "t1" -> com.example.repository.RecommendationEngine.sampleViewedItems[1]
+            "t3" -> com.example.repository.RecommendationEngine.sampleViewedItems[1]
+            "t2" -> com.example.repository.RecommendationEngine.sampleViewedItems[3]
+            else -> com.example.repository.RecommendationEngine.sampleViewedItems[0]
+        }
+    }
+
     // 1. Resolve Trend data dynamically from ID
     val trendData = remember(trendId) {
         when (trendId.lowercase()) {
@@ -299,6 +309,35 @@ fun TrendingDetailScreen(
                                         color = Color.Green
                                     )
                                 }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
+                            onClick = { isRelatedSheetOpen = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(38.dp)
+                                .testTag("btn_intel_related_sheet")
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "Analyze Related Content",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
                             }
                         }
                     }
@@ -571,5 +610,12 @@ fun TrendingDetailScreen(
             
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+
+    if (isRelatedSheetOpen) {
+        RelatedContentBottomSheet(
+            onDismissRequest = { isRelatedSheetOpen = false },
+            initialViewedItem = viewedItemToPass
+        )
     }
 }

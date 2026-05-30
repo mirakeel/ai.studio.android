@@ -16,10 +16,10 @@ val AccentIndigoLight = Color(0xFF818CF8)
 val AccentIndigoDark = Color(0xFF1E1B4B)
 
 // Neutral black & gray scale (Deep dark-mode aesthetic)
-val DarkBackground = Color(0xFF090D16)      // Pure Slate Black Background
-val DarkSurface = Color(0xFF161B26)         // Rich Deep Gray Card Face
-val DarkSurfaceElevated = Color(0xFF1F2635) // Elegant Elevated Container
-val SubtleBorderColor = Color(0xFF2E3748)   // Very subtle, clear dark-gray border
+val DarkBackground = Color(0xFF0F172A)      // Slate 900
+val DarkSurface = Color(0xFF1E293B)         // Slate 800
+val DarkSurfaceElevated = Color(0xFF334155) // Slate 700
+val SubtleBorderColor = Color(0xFF475569)   // Slate 600
 
 val TextPrimary = Color(0xFFF8FAFC)         // Slate 50
 val TextSecondary = Color(0xFF94A3B8)       // Slate 400

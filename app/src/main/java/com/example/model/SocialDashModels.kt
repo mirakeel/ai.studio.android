@@ -12,6 +12,23 @@ enum class ActivityFilter {
     POSTS, LIKES, COMMENTS, REPOSTS
 }
 
+enum class IntelCategory {
+    TECHNOLOGY, LIFESTYLE, BUSINESS, CREATIVE, FINANCE, EDUCATION, ENTERTAINMENT
+}
+
+data class MentionedAccount(
+    val handle: String,
+    val displayName: String,
+    val followerCount: String,
+    val avatarColorSeed: String = ""
+)
+
+data class TopicSummary(
+    val mainConcept: String,
+    val summaryText: String,
+    val keyBulletPoints: List<String> = emptyList()
+)
+
 data class PlatformInfo(
     val platform: Platform,
     val displayName: String,
@@ -30,13 +47,31 @@ data class TrendingTopic(
     val platform: Platform,
     val title: String,
     val impressions: Long,
-    val velocity: Double
+    val velocity: Double,
+    // AI Intel additions
+    val topicSummary: TopicSummary? = null,
+    val whyTrending: String = "",
+    val mentionedAccounts: List<MentionedAccount> = emptyList(),
+    val contentExamples: List<String> = emptyList(),
+    val intelCategory: IntelCategory = IntelCategory.TECHNOLOGY
+)
+
+data class PlatformIntel(
+    val platform: Platform,
+    val overallSentiment: String,
+    val volumeTrend: String,
+    val topCategory: IntelCategory,
+    val trendingTopics: List<TrendingTopic> = emptyList(),
+    val lastUpdated: Long = System.currentTimeMillis()
 )
 
 data class UsageStats(
     val platform: Platform,
     val dailyImpressions: Long,
-    val engagementRate: Double
+    val engagementRate: Double,
+    val minutesToday: Int = 0,
+    val minutesWeek: Int = 0,
+    val minutesMonth: Int = 0
 )
 
 data class UserSettings(
@@ -46,4 +81,10 @@ data class UserSettings(
     val morningBriefingTime: String, // HH:mm format
     val interestTopics: Set<String>,
     val activityFilters: Set<ActivityFilter>
+)
+
+data class PlatformAnalysis(
+    val platform: Platform,
+    val analysisText: String,
+    val timestamp: Long
 )
