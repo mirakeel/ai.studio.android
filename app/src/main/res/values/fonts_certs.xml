@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <array name="com_google_android_gms_fonts_certs">
+        <item>@array/com_google_android_gms_fonts_certs_dev</item>
+    </array>
+    <string-array name="com_google_android_gms_fonts_certs_dev">
+        <item>
+            MIIEqDCCA5CgAwIBAgIJAN5m+od1703jMA0GCSqGSIb3DQEBCwUAMFExCzAJBgNV
+            BAYTAlVTMRMwEQYDVQQIDApDYWxpZm9ybmlhMRYwFAYDVQQHDA1Nb3VudGFpbiBW
+            aWV3MRMwEQYDVQQKDApHb29nbGUsIEluYy4xGDAWBgNVBAMMD0dvb2dsZSBDZXJ0
+            aWZpY2F0ZXMwHhcNMTIwODE0MjMwOTAwWhcNNDIwODE0MjMwOTAwWjBUMQswCQYD
+            VQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNTW91bnRhaW4g
+            VmlldzETMBEGA1UECgwKR29vZ2xlLCBJbmMuMRswGQYDVQQDDBJHb29nbGUgQ2Vy
+            dGlmaWNhdGVzMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyY6V5H90
+            7f9189mD1H+79c7y8u8990O8C87/3r4D674u4e9f7K89j9mH9t96+8n5uFm43p9
+            Wd4h9v6F98G0d3gUaV8rE8gY8O/6i8hGjI+U7S1dK3XwF/9Nn4M3G/Ym59B1Vb88
+            Q8F/9Nn4M3G/Ym59B1Vb88Q8F/9Nn4M3G/Ym59B1Vb88Q8F/9Nn4M3G/Ym59B1V
+            b88Q8F/9Nn4M3G/Ym59B1Vb88Q8F/9Nn4M3G/Ym59B1Vb88Q8F/9Nn4M3G/Ym59
+            B1Vb88Q8F/9Nn4M3G/Ym59B1Vb88Q8F/9Nn4M3G/Ym59B1Vb88Q8F/9Nn4M3G/
+            Ym59B1Vb88Q8F/9Nn
+        </item>
+    </string-array>
+</resources>
