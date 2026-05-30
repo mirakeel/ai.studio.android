@@ -34,6 +34,14 @@ fun SettingsScreen(
     var interestTopics by remember { mutableStateOf(userSettings.interestTopics) }
     var activityFilters by remember { mutableStateOf(userSettings.activityFilters) }
 
+    LaunchedEffect(userSettings) {
+        aiDigestsEnabled = userSettings.aiDigestsEnabled
+        notificationStyle = userSettings.notificationStyle.name
+        syncFreq = userSettings.syncFrequencyMinutes
+        interestTopics = userSettings.interestTopics
+        activityFilters = userSettings.activityFilters
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
